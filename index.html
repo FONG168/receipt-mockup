@@ -2027,6 +2027,84 @@
       white-space: nowrap;
     }
 
+    .save-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: #f1f5f9;
+      color: #64748b;
+      border: 1px solid #e2e8f0;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .save-indicator .save-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #94a3b8;
+      transition: all 0.2s ease;
+    }
+
+    .save-indicator.saved {
+      background: #f0fdf4;
+      color: #15803d;
+      border-color: #bbf7d0;
+    }
+
+    .save-indicator.saved .save-dot {
+      background: #16a34a;
+      box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.2);
+    }
+
+    .save-indicator.saving {
+      background: #eff6ff;
+      color: #2563eb;
+      border-color: #bfdbfe;
+    }
+
+    .save-indicator.saving .save-dot {
+      background: #3b82f6;
+      animation: pulseDot 0.8s infinite alternate;
+    }
+
+    @keyframes pulseDot {
+      from { opacity: 0.4; transform: scale(0.8); }
+      to { opacity: 1; transform: scale(1.2); }
+    }
+
+    .save-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 5px 9px;
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+      background: #ffffff;
+      color: #334155;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+
+    .save-btn:hover {
+      background: #f8fafc;
+      color: #0f172a;
+      border-color: #94a3b8;
+      transform: translateY(-1px);
+    }
+
+    .save-btn:active {
+      transform: translateY(0);
+    }
+
     .quick-copy-header-btn {
       padding: 6px 12px;
       font-size: 11.5px;
@@ -2571,16 +2649,28 @@
         Template Studio
       </h2>
       <div style="display:flex; align-items:center; gap:6px;">
+        <div class="save-indicator saved" id="saveIndicator" title="All edits are automatically saved to your browser storage">
+          <span class="save-dot"></span>
+          <span class="save-text">Auto-saved</span>
+        </div>
+        <button class="save-btn" id="manualSaveBtn" onclick="manualSaveNow()" title="Save changes now to browser memory">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+            <polyline points="17 21 17 13 7 13 7 21"></polyline>
+            <polyline points="7 3 7 8 15 8"></polyline>
+          </svg>
+          Save
+        </button>
         <button class="quick-copy-header-btn" id="quickCopyHeaderBtn" onclick="copyReceiptImageToClipboard()"
           title="Copy 100% Mockup Image to Clipboard (Ctrl+V)">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
             stroke-linecap="round" stroke-linejoin="round">
             <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
             <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
           </svg>
-          Copy Image
+          Copy
         </button>
-        <span class="badge-chip">Live Editor</span>
       </div>
     </div>
 
@@ -3337,6 +3427,8 @@
     };
     function activeUsdt() { return usdtMode === 'deposit' ? usdtDepState : usdtState; }
 
+    const STORAGE_KEY = "receipt_mockup_autosave";
+
     const idrState = {
       successTitle: "Successful!",
       subtitle: "Your transaction is successful",
@@ -3615,6 +3707,8 @@
 
     function updateStatusTime(val) {
       statusClock = val || "9:41";
+      const inp = document.getElementById("inputStatusTime");
+      if (inp && inp.value !== statusClock) inp.value = statusClock;
       renderSystemBars();
     }
 
@@ -3736,7 +3830,9 @@
     }
 
     function updateStatusBattery(val) {
-      statusBattery = val || "84";
+      statusBattery = val || "100";
+      const inp = document.getElementById("inputStatusBattery");
+      if (inp && inp.value !== String(statusBattery)) inp.value = statusBattery;
       renderSystemBars();
     }
 
@@ -4553,7 +4649,14 @@
       setNetworkType('wifi');
       setWifiSignal(3);
       renderSystemBars();
-      showToast("Defaults restored!");
+      localStorage.removeItem(STORAGE_KEY);
+      const indicator = document.getElementById("saveIndicator");
+      if (indicator) {
+        indicator.className = "save-indicator";
+        const txt = indicator.querySelector(".save-text");
+        if (txt) txt.textContent = "Defaults";
+      }
+      showToast("Defaults restored and saved state cleared!");
     }
 
 
@@ -4740,14 +4843,34 @@
     }
 
     // ============================================================================
-    // 100% Form Data State Backup & Restore System
+    // 100% Form Data State Backup, Auto-Save & Persistence System
     // ============================================================================
-    function copyFullFormData() {
-      const fullPayload = {
+    function updateSaveIndicator(status) {
+      const indicator = document.getElementById("saveIndicator");
+      if (!indicator) return;
+      const textSpan = indicator.querySelector(".save-text");
+      if (status === 'saving') {
+        indicator.className = "save-indicator saving";
+        if (textSpan) textSpan.textContent = "Saving...";
+      } else if (status === 'manual') {
+        indicator.className = "save-indicator saved";
+        if (textSpan) textSpan.textContent = "Saved";
+      } else if (status === 'saved') {
+        indicator.className = "save-indicator saved";
+        if (textSpan) textSpan.textContent = "Auto-saved";
+      } else if (status === 'error') {
+        indicator.className = "save-indicator";
+        if (textSpan) textSpan.textContent = "Save Error";
+      }
+    }
+
+    function getFullStateSnapshot() {
+      return {
         version: "1.0",
         savedAt: new Date().toISOString(),
         currentTemplate: currentTemplate,
         templateFonts: { ...templateFonts },
+        idrLogoWidth: typeof idrLogoWidth !== 'undefined' ? idrLogoWidth : 136,
         systemSettings: {
           deviceOS,
           iphoneStyle,
@@ -4763,14 +4886,114 @@
           statusNetworkType
         },
         templateData: {
-          idr: idrState,
-          idrIn: idrInState,
-          usdt: usdtState,
-          usdtDeposit: usdtDepState
+          idr: JSON.parse(JSON.stringify(idrState)),
+          idrIn: JSON.parse(JSON.stringify(idrInState)),
+          usdt: JSON.parse(JSON.stringify(usdtState)),
+          usdtDeposit: JSON.parse(JSON.stringify(usdtDepState))
         },
         usdtMode
       };
+    }
 
+    function applyFullStateSnapshot(data, silent = false) {
+      if (!data) return;
+      if (data.templateFonts) {
+        if (data.templateFonts.usdt) setTemplateFont('usdt', data.templateFonts.usdt);
+        if (data.templateFonts.idr) setTemplateFont('idr', data.templateFonts.idr);
+      }
+      if (typeof data.idrLogoWidth === 'number') {
+        idrLogoWidth = data.idrLogoWidth;
+        const logoImg = document.getElementById("octoBrandLogoImg");
+        if (logoImg) logoImg.style.width = idrLogoWidth + "px";
+      }
+      if (data.systemSettings) {
+        const s = data.systemSettings;
+        if (s.deviceOS) setDeviceOS(s.deviceOS);
+        if (s.iphoneStyle) setIphoneStyle(s.iphoneStyle);
+        if (s.privacyDot) setPrivacyDot(s.privacyDot);
+        if (s.chassisFinish) setChassisFinish(s.chassisFinish);
+        if (typeof s.isFrameVisible === 'boolean') setFrameVisible(s.isFrameVisible);
+        if (typeof s.isStatusBarVisible === 'boolean') setStatusBarVisible(s.isStatusBarVisible);
+        if (s.statusClock) updateStatusTime(s.statusClock);
+        if (s.statusBattery) updateStatusBattery(s.statusBattery);
+        if (typeof s.statusCellular === 'number') setCellularSignal(s.statusCellular);
+        if (typeof s.statusWifi === 'number') setWifiSignal(s.statusWifi);
+        if (typeof s.statusNetworkType === 'string') setNetworkType(s.statusNetworkType);
+        if (s.androidNavStyle) setAndroidNavStyle(s.androidNavStyle);
+      }
+      if (data.templateData) {
+        if (data.templateData.idr) Object.assign(idrState, data.templateData.idr);
+        if (data.templateData.idrIn) Object.assign(idrInState, data.templateData.idrIn);
+        if (data.templateData.usdt) Object.assign(usdtState, data.templateData.usdt);
+        if (data.templateData.usdtDeposit) Object.assign(usdtDepState, data.templateData.usdtDeposit);
+        if (data.usdtMode) usdtMode = data.usdtMode;
+      }
+      if (data.currentTemplate) {
+        switchTemplate(data.currentTemplate);
+      } else {
+        rebuildEditorControls();
+        renderSystemBars();
+      }
+      if (!silent) {
+        showToast("✅ 100% Form Data restored successfully!");
+      }
+    }
+
+    let autoSaveTimer = null;
+    function triggerAutoSave() {
+      updateSaveIndicator('saving');
+      clearTimeout(autoSaveTimer);
+      autoSaveTimer = setTimeout(() => {
+        try {
+          const snapshot = getFullStateSnapshot();
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+          updateSaveIndicator('saved');
+        } catch (e) {
+          console.error("Auto-save failed:", e);
+          updateSaveIndicator('error');
+        }
+      }, 300);
+    }
+
+    function manualSaveNow() {
+      try {
+        const snapshot = getFullStateSnapshot();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+        updateSaveIndicator('manual');
+        const btn = document.getElementById("manualSaveBtn");
+        if (btn) {
+          const orig = btn.innerHTML;
+          btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Saved!`;
+          btn.style.borderColor = "#86efac";
+          btn.style.color = "#15803d";
+          setTimeout(() => {
+            btn.innerHTML = orig;
+            btn.style.borderColor = "";
+            btn.style.color = "";
+          }, 1500);
+        }
+        showToast("✅ All changes saved successfully!");
+      } catch (e) {
+        alert("Failed to save: " + e.message);
+      }
+    }
+
+    function loadFromLocalStorage() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return false;
+        const data = JSON.parse(raw);
+        applyFullStateSnapshot(data, true);
+        updateSaveIndicator('saved');
+        return true;
+      } catch (e) {
+        console.warn("Could not load auto-saved data:", e);
+        return false;
+      }
+    }
+
+    function copyFullFormData() {
+      const fullPayload = getFullStateSnapshot();
       const jsonStr = JSON.stringify(fullPayload, null, 2);
       copyText(jsonStr, "✅ 100% Form Data copied to clipboard!");
     }
@@ -4780,35 +5003,8 @@
       if (!input) return;
       try {
         const data = JSON.parse(input);
-        if (data.templateFonts) { setTemplateFont('usdt', data.templateFonts.usdt); setTemplateFont('idr', data.templateFonts.idr); }
-        if (data.systemSettings) {
-          const s = data.systemSettings;
-          if (s.deviceOS) setDeviceOS(s.deviceOS);
-          if (s.iphoneStyle) setIphoneStyle(s.iphoneStyle);
-          if (s.privacyDot) setPrivacyDot(s.privacyDot);
-          if (s.chassisFinish) setChassisFinish(s.chassisFinish);
-          if (typeof s.isFrameVisible === 'boolean') setPhoneFrameVisible(s.isFrameVisible);
-          if (typeof s.isStatusBarVisible === 'boolean') setStatusBarVisible(s.isStatusBarVisible);
-          if (s.statusClock) setStatusClock(s.statusClock);
-          if (s.statusBattery) setStatusBattery(s.statusBattery);
-          if (typeof s.statusCellular === 'number') setCellularSignal(s.statusCellular);
-          if (typeof s.statusWifi === 'number') setWifiSignal(s.statusWifi);
-          if (typeof s.statusNetworkType === 'string') setNetworkType(s.statusNetworkType);
-        }
-        if (data.templateData) {
-          if (data.templateData.idr) Object.assign(idrState, data.templateData.idr);
-          if (data.templateData.idrIn) Object.assign(idrInState, data.templateData.idrIn);
-          if (data.templateData.usdt) Object.assign(usdtState, data.templateData.usdt);
-          if (data.templateData.usdtDeposit) Object.assign(usdtDepState, data.templateData.usdtDeposit);
-          if (data.usdtMode) usdtMode = data.usdtMode;
-        }
-        if (data.currentTemplate) {
-          switchTemplate(data.currentTemplate);
-        } else {
-          rebuildEditorControls();
-          renderSystemBars();
-        }
-        showToast("✅ 100% Form Data restored successfully!");
+        applyFullStateSnapshot(data, false);
+        triggerAutoSave();
       } catch (e) {
         alert("Invalid JSON format: " + e.message);
       }
@@ -4822,6 +5018,14 @@
       copyText(jsonStr, "Transaction data copied as JSON!");
     }
 
+    // Auto-save event listeners across all inputs & controls
+    document.addEventListener("input", () => triggerAutoSave(), { passive: true });
+    document.addEventListener("change", () => triggerAutoSave(), { passive: true });
+    document.addEventListener("click", (e) => {
+      if (e.target.closest("button:not(#quickCopyHeaderBtn):not(#manualSaveBtn), .toggle-btn, .radio-btn, .pill-btn, .control-btn, .seg-btn, .curr-tab")) {
+        setTimeout(triggerAutoSave, 50);
+      }
+    }, { passive: true });
 
     // ============================================================================
     // Configuration Sub-Tabs Switcher (Header/Device vs Receipt Content vs Export)
@@ -4856,12 +5060,17 @@
     }
 
     // Initial load
-    switchTemplate('idr-in');
-    switchConfigTab('receipt');
-    setDeviceOS('iphone');
-    setIphoneStyle('dynamic');
-    setPrivacyDot('orange');
-    setChassisFinish('silver');
+    const savedStateLoaded = loadFromLocalStorage();
+    if (!savedStateLoaded) {
+      switchTemplate('idr-in');
+      switchConfigTab('receipt');
+      setDeviceOS('iphone');
+      setIphoneStyle('dynamic');
+      setPrivacyDot('orange');
+      setChassisFinish('silver');
+    } else {
+      switchConfigTab('receipt');
+    }
   </script>
 </body>
 
