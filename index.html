@@ -2105,6 +2105,28 @@
       transform: translateY(0);
     }
 
+    .mini-sync-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 2px 7px;
+      font-size: 10.5px;
+      font-weight: 600;
+      background: #f8fafc;
+      color: #334155;
+      border: 1px solid #cbd5e1;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+
+    .mini-sync-btn:hover {
+      background: #f1f5f9;
+      color: #0f172a;
+      border-color: #94a3b8;
+    }
+
     .quick-copy-header-btn {
       padding: 6px 12px;
       font-size: 11.5px;
@@ -3397,6 +3419,86 @@
     let statusNetworkType = 'wifi'; // 'wifi' | '5g' | 'lte' | '4g' | 'off'
     let idrLogoWidth = 136;
 
+    // ============================================================================
+    // Date & Time Dynamic Formatting & Daily Auto-Update System
+    // ============================================================================
+    const MONTH_NAMES_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+    function getTodayCalendarKey() {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    // 1. USDT Format: "MMM D, YYYY h:mm A" (e.g. "Oct 6, 2026 4:44 PM")
+    function formatUsdtDate(dateObj = new Date(), customTimeStr = null) {
+      const d = (dateObj instanceof Date && !isNaN(dateObj)) ? dateObj : new Date();
+      const month = MONTH_NAMES_EN[d.getMonth()];
+      const day = d.getDate();
+      const year = d.getFullYear();
+      let timeStr = "";
+      if (customTimeStr && typeof customTimeStr === 'string' && customTimeStr.trim()) {
+        timeStr = customTimeStr.trim();
+      } else {
+        let hours = d.getHours();
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12;
+        hours = hours ? hours : 12;
+        timeStr = `${hours}:${minutes} ${ampm}`;
+      }
+      return `${month} ${day}, ${year} ${timeStr}`;
+    }
+
+    // 2. IDR Format: "DD MMM YYYY HH:mm" (e.g. "06 Oct 2026 22:31")
+    function formatIdrDate(dateObj = new Date(), customTimeStr = null, offsetDays = 0) {
+      const d = (dateObj instanceof Date && !isNaN(dateObj)) ? new Date(dateObj) : new Date();
+      if (offsetDays) d.setDate(d.getDate() - offsetDays);
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = MONTH_NAMES_EN[d.getMonth()];
+      const year = d.getFullYear();
+      let timeStr = "";
+      if (customTimeStr && typeof customTimeStr === 'string' && customTimeStr.trim()) {
+        timeStr = customTimeStr.trim();
+      } else {
+        const hh = String(d.getHours()).padStart(2, '0');
+        const mm = String(d.getMinutes()).padStart(2, '0');
+        timeStr = `${hh}:${mm}`;
+      }
+      return `${day} ${month} ${year} ${timeStr}`;
+    }
+
+    function formatDynamicDate(offsetDays = 0, defaultTime = null) {
+      return formatIdrDate(new Date(), defaultTime, offsetDays);
+    }
+
+    function extractTimePart(str, isUsdt = true) {
+      if (!str || typeof str !== 'string') return null;
+      if (isUsdt) {
+        const m = str.match(/(\d{1,2}:\d{2}\s*(?:AM|PM|am|pm))/i);
+        return m ? m[1].toUpperCase() : null;
+      } else {
+        const m = str.match(/(\d{1,2}:\d{2})/);
+        return m ? m[1] : null;
+      }
+    }
+
+    function updateIdrRefToToday(refStr) {
+      if (!refStr || typeof refStr !== 'string' || !refStr.startsWith("MB")) return refStr;
+      const now = new Date();
+      const dd = String(now.getDate()).padStart(2, '0');
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      return refStr.replace(/^MB\d{4}/, `MB${dd}${mm}`);
+    }
+
+    function getDynamicRefCode(offsetDays = 0) {
+      const d = new Date();
+      d.setDate(d.getDate() - offsetDays);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${yyyy}${mm}${dd}SAI10O${Math.floor(10000000 + Math.random() * 90000000)}`;
+    }
+
     // Template States
     const usdtState = {
       title: "Withdrawn 351.96 USDT",
@@ -3408,7 +3510,7 @@
       network: "Tron (TRC20)",
       fee: "1.5 USDT",
       txId: "7b762...00487",
-      time: "Jul 28, 2026 9:42 PM",
+      time: formatUsdtDate(new Date(), "9:42 PM"),
       ref: "418689785"
     };
 
@@ -3423,7 +3525,7 @@
       txId: "2ccc6...4556e",
       addressLine1: "THQcQY8fT9hZiL2uNnaVN",
       addressLine2: "G9A5K8ot8gFTD",
-      time: "Sep 23, 2026 4:44 PM"
+      time: formatUsdtDate(new Date(), "4:44 PM")
     };
     function activeUsdt() { return usdtMode === 'deposit' ? usdtDepState : usdtState; }
 
@@ -3440,11 +3542,11 @@
       bankName: "Bank Rakyat Indonesia",
       accNumber: "336201000053563",
       favText: "Add to Favorites",
-      time: "02 Jun 2026 22:31",
+      time: formatIdrDate(new Date(), "22:31"),
       txId: "000984139126",
       sender: "SUMAYAH SHARON",
       type: "BI-FAST",
-      ref: "MB02062042148519"
+      ref: updateIdrRefToToday("MB02062042148519")
     };
 
     // ============================================================================
@@ -3904,33 +4006,8 @@
     // ============================================================================
 
     // ============================================================================
+    // Transactions Default Data Generator
     // ============================================================================
-    // Dynamic Date Helpers: Keep Transactions Up To Date Daily (Reverse Chronological)
-    // ============================================================================
-    function formatDynamicDate(offsetDays = 0, defaultTime = null) {
-      const d = new Date();
-      d.setDate(d.getDate() - offsetDays);
-      const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-      const day = String(d.getDate()).padStart(2, '0');
-      const month = months[d.getMonth()];
-      const year = d.getFullYear();
-      let timeStr = defaultTime;
-      if (!timeStr) {
-        const hh = String(d.getHours()).padStart(2, '0');
-        const mm = String(d.getMinutes()).padStart(2, '0');
-        timeStr = `${hh}:${mm}`;
-      }
-      return `${day} ${month} ${year} ${timeStr}`;
-    }
-
-    function getDynamicRefCode(offsetDays = 0) {
-      const d = new Date();
-      d.setDate(d.getDate() - offsetDays);
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const dd = String(d.getDate()).padStart(2, '0');
-      return `${yyyy}${mm}${dd}SAI10O${Math.floor(10000000 + Math.random() * 90000000)}`;
-    }
 
     function getDefaultTransactions() {
       return [
@@ -4071,6 +4148,65 @@
       renderIdrInUI();
       rebuildEditorControls();
       showToast("All dates synced to Today (Reverse Order)!");
+    }
+
+    function syncAllTemplatesToToday(forceCurrentTime = false) {
+      const now = new Date();
+
+      // USDT Withdraw
+      const usdtTimePart = forceCurrentTime ? null : (extractTimePart(usdtState.time, true) || "9:42 PM");
+      usdtState.time = formatUsdtDate(now, usdtTimePart);
+
+      // USDT Deposit
+      const usdtDepTimePart = forceCurrentTime ? null : (extractTimePart(usdtDepState.time, true) || "4:44 PM");
+      usdtDepState.time = formatUsdtDate(now, usdtDepTimePart);
+
+      // IDR Sent
+      const idrTimePart = forceCurrentTime ? null : (extractTimePart(idrState.time, false) || "22:31");
+      idrState.time = formatIdrDate(now, idrTimePart);
+      idrState.ref = updateIdrRefToToday(idrState.ref);
+
+      // IDR Received (Transactions list)
+      if (idrInState && Array.isArray(idrInState.transactions)) {
+        const defaultTimes = ["22:39", "10:55", "18:21", "22:59", "14:15", "09:30"];
+        idrInState.transactions.forEach((txn, idx) => {
+          const offset = Math.floor(idx / 2);
+          const tPart = forceCurrentTime ? null : (extractTimePart(txn.time, false) || defaultTimes[idx % defaultTimes.length]);
+          txn.time = formatIdrDate(now, tPart, offset);
+          if (txn.lines && txn.lines.length > 0) {
+            txn.lines = txn.lines.map(line => {
+              if (/^\d{8}SAI/.test(line) || /^\d{8}/.test(line)) {
+                return getDynamicRefCode(offset);
+              }
+              return line;
+            });
+          }
+        });
+      }
+    }
+
+    function syncActiveDateToToday(forceCurrentTime = false) {
+      const now = new Date();
+      if (currentTemplate === 'usdt') {
+        const st = activeUsdt();
+        const tPart = forceCurrentTime ? null : (extractTimePart(st.time, true) || (usdtMode === 'deposit' ? "4:44 PM" : "9:42 PM"));
+        st.time = formatUsdtDate(now, tPart);
+        renderUsdtUI();
+        rebuildEditorControls();
+        triggerAutoSave();
+        showToast(forceCurrentTime ? `USDT time set to now: ${st.time}` : `USDT date synced to today: ${st.time}`);
+      } else if (currentTemplate === 'idr') {
+        const tPart = forceCurrentTime ? null : (extractTimePart(idrState.time, false) || "22:31");
+        idrState.time = formatIdrDate(now, tPart);
+        idrState.ref = updateIdrRefToToday(idrState.ref);
+        renderIdrUI();
+        rebuildEditorControls();
+        triggerAutoSave();
+        showToast(forceCurrentTime ? `IDR time set to now: ${idrState.time}` : `IDR date synced to today: ${idrState.time}`);
+      } else if (currentTemplate === 'idr-in') {
+        syncTransactionsToToday();
+        triggerAutoSave();
+      }
     }
 
     function switchHistTab(tab) {
@@ -4227,7 +4363,20 @@
         const usdtSt = activeUsdt();
         for (const [key, label] of Object.entries(usdtLabels)) {
           const lbl = document.createElement("label");
-          lbl.textContent = label;
+          if (key === 'time') {
+            const headerRow = document.createElement("div");
+            headerRow.style.cssText = "display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;";
+            headerRow.innerHTML = `
+              <span>${label}</span>
+              <div style="display:flex; gap:4px;">
+                <button type="button" class="mini-sync-btn" onclick="syncActiveDateToToday(false)" title="Update date to Today (preserves time)">📅 Today</button>
+                <button type="button" class="mini-sync-btn" onclick="syncActiveDateToToday(true)" title="Set date and time to Current Time">⏱️ Now</button>
+              </div>
+            `;
+            lbl.appendChild(headerRow);
+          } else {
+            lbl.textContent = label;
+          }
           const isMultiline = key === 'title' && (usdtSt[key] || '').includes('\n');
           const inp = isMultiline ? document.createElement("textarea") : document.createElement("input");
           if (isMultiline) {
@@ -4435,7 +4584,20 @@
 
         for (const [key, label] of Object.entries(idrFieldLabels)) {
           const lbl = document.createElement("label");
-          lbl.textContent = label;
+          if (key === 'time') {
+            const headerRow = document.createElement("div");
+            headerRow.style.cssText = "display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;";
+            headerRow.innerHTML = `
+              <span>${label}</span>
+              <div style="display:flex; gap:4px;">
+                <button type="button" class="mini-sync-btn" onclick="syncActiveDateToToday(false)" title="Update date to Today (preserves time)">📅 Today</button>
+                <button type="button" class="mini-sync-btn" onclick="syncActiveDateToToday(true)" title="Set date and time to Current Time">⏱️ Now</button>
+              </div>
+            `;
+            lbl.appendChild(headerRow);
+          } else {
+            lbl.textContent = label;
+          }
           const inp = document.createElement("input");
           inp.value = idrState[key];
           inp.addEventListener("input", (e) => {
@@ -4603,7 +4765,7 @@
         Object.assign(usdtDepState, {
           title: "Deposited 1,135.540588\nUSDT", fiat: "~$1,135.16", status: "Completed",
           price: "$0.99/USDT", network: "Tron (TRC20)", txId: "2ccc6...4556e",
-          addressLine1: "THQcQY8fT9hZiL2uNnaVN", addressLine2: "G9A5K8ot8gFTD", time: "Sep 23, 2026 4:44 PM"
+          addressLine1: "THQcQY8fT9hZiL2uNnaVN", addressLine2: "G9A5K8ot8gFTD", time: formatUsdtDate(new Date(), "4:44 PM")
         });
         renderUsdtUI();
       } else if (currentTemplate === 'usdt') {
@@ -4617,7 +4779,7 @@
           network: "Tron (TRC20)",
           fee: "1.5 USDT",
           txId: "7b762...00487",
-          time: "Jul 28, 2026 9:42 PM",
+          time: formatUsdtDate(new Date(), "9:42 PM"),
           ref: "418689785"
         });
         renderUsdtUI();
@@ -4633,11 +4795,11 @@
           bankName: "Bank Rakyat Indonesia",
           accNumber: "336201000053563",
           favText: "Add to Favorites",
-          time: "02 Jun 2026 22:31",
+          time: formatIdrDate(new Date(), "22:31"),
           txId: "000984139126",
           sender: "SUMAYAH SHARON",
           type: "BI-FAST",
-          ref: "MB02062042148519"
+          ref: updateIdrRefToToday("MB02062042148519")
         });
         idrLogoWidth = 136;
         const logoImg = document.getElementById("octoBrandLogoImg");
@@ -4868,6 +5030,7 @@
       return {
         version: "1.0",
         savedAt: new Date().toISOString(),
+        lastCalendarDate: getTodayCalendarKey(),
         currentTemplate: currentTemplate,
         templateFonts: { ...templateFonts },
         idrLogoWidth: typeof idrLogoWidth !== 'undefined' ? idrLogoWidth : 136,
@@ -4984,6 +5147,19 @@
         if (!raw) return false;
         const data = JSON.parse(raw);
         applyFullStateSnapshot(data, true);
+        
+        // Auto Up-To-Date Daily Check:
+        // Automatically sync dates in all templates to today if the day has changed
+        const todayCalKey = getTodayCalendarKey();
+        if (data.lastCalendarDate !== todayCalKey) {
+          syncAllTemplatesToToday(false);
+          if (currentTemplate === 'usdt') renderUsdtUI();
+          else if (currentTemplate === 'idr') renderIdrUI();
+          else if (currentTemplate === 'idr-in') renderIdrInUI();
+          rebuildEditorControls();
+          triggerAutoSave();
+        }
+
         updateSaveIndicator('saved');
         return true;
       } catch (e) {
@@ -5058,6 +5234,36 @@
         }
       }
     }
+
+    // Daily Auto-Update Interval & Tab Visibility Rollover Watcher
+    let currentActiveDateKey = getTodayCalendarKey();
+    setInterval(() => {
+      const todayKey = getTodayCalendarKey();
+      if (currentActiveDateKey && currentActiveDateKey !== todayKey) {
+        currentActiveDateKey = todayKey;
+        syncAllTemplatesToToday(false);
+        if (currentTemplate === 'usdt') renderUsdtUI();
+        else if (currentTemplate === 'idr') renderIdrUI();
+        else if (currentTemplate === 'idr-in') renderIdrInUI();
+        rebuildEditorControls();
+        triggerAutoSave();
+      }
+    }, 60000);
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === 'visible') {
+        const todayKey = getTodayCalendarKey();
+        if (currentActiveDateKey && currentActiveDateKey !== todayKey) {
+          currentActiveDateKey = todayKey;
+          syncAllTemplatesToToday(false);
+          if (currentTemplate === 'usdt') renderUsdtUI();
+          else if (currentTemplate === 'idr') renderIdrUI();
+          else if (currentTemplate === 'idr-in') renderIdrInUI();
+          rebuildEditorControls();
+          triggerAutoSave();
+        }
+      }
+    });
 
     // Initial load
     const savedStateLoaded = loadFromLocalStorage();
