@@ -4402,6 +4402,8 @@
     }
 
     const STORAGE_KEY = "receipt_mockup_autosave";
+    let autoSaveTimer = null;
+    let isAppReady = false;
 
     const idrState = {
       successTitle: "Successful!",
@@ -4587,6 +4589,7 @@
       }
 
       renderSystemBars();
+      triggerAutoSave();
     }
 
     function setIphoneStyle(style) {
@@ -4606,6 +4609,7 @@
       }
 
       renderSystemBars();
+      triggerAutoSave();
     }
 
     function setPrivacyDot(dot) {
@@ -4614,6 +4618,7 @@
       document.getElementById("btn-priv-green").classList.toggle("active", dot === 'green');
       document.getElementById("btn-priv-off").classList.toggle("active", dot === 'off');
       renderSystemBars();
+      triggerAutoSave();
     }
 
     function setChassisFinish(finish) {
@@ -4630,6 +4635,7 @@
         wrapper.classList.remove("chassis-silver", "chassis-black", "chassis-gold");
         wrapper.classList.add(`chassis-${finish}`);
       }
+      triggerAutoSave();
     }
 
     function setFrameVisible(visible) {
@@ -4647,6 +4653,7 @@
           wrapper.classList.remove("with-frame");
         }
       }
+      triggerAutoSave();
     }
 
     function setStatusBarVisible(visible) {
@@ -4662,6 +4669,7 @@
         btnOn.classList.remove("active");
       }
       renderSystemBars();
+      triggerAutoSave();
     }
 
     function setAndroidNavStyle(style) {
@@ -4677,6 +4685,7 @@
         btnButtons.classList.remove("active");
       }
       renderSystemBars();
+      triggerAutoSave();
     }
 
     function updateStatusTime(val) {
@@ -5016,6 +5025,7 @@
       idrInState.transactions.unshift(newTxn);
       renderIdrInUI();
       rebuildEditorControls();
+      triggerAutoSave();
       showToast(isCr ? "Added Received at TOP (Today)" : "Added Outgoing at TOP (Today)");
     }
 
@@ -5024,6 +5034,7 @@
         const removed = idrInState.transactions.splice(index, 1);
         renderIdrInUI();
         rebuildEditorControls();
+        triggerAutoSave();
         showToast("Removed: " + (removed[0]?.title || "Transaction"));
       }
     }
@@ -5036,6 +5047,7 @@
       idrInState.transactions[newIdx] = temp;
       renderIdrInUI();
       rebuildEditorControls();
+      triggerAutoSave();
     }
 
     function syncTransactionsToToday() {
@@ -5055,6 +5067,7 @@
       });
       renderIdrInUI();
       rebuildEditorControls();
+      triggerAutoSave();
       showToast("All dates synced to Today (Reverse Order)!");
     }
 
@@ -5154,6 +5167,7 @@
       } else {
         if (picker) picker.style.display = "none";
         currentVndAddDate = val;
+        triggerAutoSave();
       }
     }
 
@@ -5596,10 +5610,10 @@
           const typeRow = document.createElement("div");
           typeRow.style.cssText = "display:flex; gap:6px; margin-bottom:8px;";
           typeRow.innerHTML = `
-        <button type="button" style="flex:1; padding:4px 6px; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer; border:1px solid ${txn.type === 'cr' ? '#047857' : '#d1d5db'}; background:${txn.type === 'cr' ? '#047857' : '#fff'}; color:${txn.type === 'cr' ? '#fff' : '#4b5563'};" onclick="idrInState.transactions[${idx}].type='cr'; renderIdrInUI(); rebuildEditorControls();">
+        <button type="button" style="flex:1; padding:4px 6px; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer; border:1px solid ${txn.type === 'cr' ? '#047857' : '#d1d5db'}; background:${txn.type === 'cr' ? '#047857' : '#fff'}; color:${txn.type === 'cr' ? '#fff' : '#4b5563'};" onclick="idrInState.transactions[${idx}].type='cr'; renderIdrInUI(); rebuildEditorControls(); triggerAutoSave();">
           🟢 Credit (+)
         </button>
-        <button type="button" style="flex:1; padding:4px 6px; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer; border:1px solid ${txn.type === 'db' ? '#991515' : '#d1d5db'}; background:${txn.type === 'db' ? '#991515' : '#fff'}; color:${txn.type === 'db' ? '#fff' : '#4b5563'};" onclick="idrInState.transactions[${idx}].type='db'; renderIdrInUI(); rebuildEditorControls();">
+        <button type="button" style="flex:1; padding:4px 6px; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer; border:1px solid ${txn.type === 'db' ? '#991515' : '#d1d5db'}; background:${txn.type === 'db' ? '#991515' : '#fff'}; color:${txn.type === 'db' ? '#fff' : '#4b5563'};" onclick="idrInState.transactions[${idx}].type='db'; renderIdrInUI(); rebuildEditorControls(); triggerAutoSave();">
           🔴 Debit (-)
         </button>
       `;
@@ -5673,7 +5687,7 @@
           + Add Outgoing (-)
         </button>
       </div>
-      <button type="button" style="padding:6px; background:#f3f4f6; color:#4b5563; border:1px solid #d1d5db; border-radius:6px; font-size:11px; cursor:pointer; margin-top:4px;" onclick="if(confirm('Clear all transactions?')){idrInState.transactions=[]; renderIdrInUI(); rebuildEditorControls();}">
+      <button type="button" style="padding:6px; background:#f3f4f6; color:#4b5563; border:1px solid #d1d5db; border-radius:6px; font-size:11px; cursor:pointer; margin-top:4px;" onclick="if(confirm('Clear all transactions?')){idrInState.transactions=[]; renderIdrInUI(); rebuildEditorControls(); triggerAutoSave();}">
         🗑️ Clear All Transactions
       </button>
     `;
@@ -6011,6 +6025,7 @@
       }
       const sel = document.getElementById(group === 'usdt' ? 'fontSelectUsdt' : 'fontSelectIdr');
       if (sel) sel.value = name;
+      triggerAutoSave();
     }
 
     function initTemplateFontSelects() {
@@ -6225,6 +6240,7 @@
         const btn = document.getElementById("btn-scale-" + s);
         if (btn) btn.classList.toggle("active", s === exportScale);
       });
+      triggerAutoSave();
       showToast(`Scale set to ${exportScale}x ${exportScale === 1 ? '(100% Native)' : 'HD'}`);
     }
 
@@ -6517,8 +6533,26 @@
       }
     }
 
-    let autoSaveTimer = null;
+    // ============================================================================
+    // Realtime Auto-Preview & Synchronization System
+    // ============================================================================
+    function updateLivePreview() {
+      if (currentTemplate === 'usdt') {
+        renderUsdtUI();
+      } else if (currentTemplate === 'idr-in') {
+        renderIdrInUI();
+      } else if (currentTemplate === 'idr') {
+        renderIdrUI();
+      } else if (currentTemplate === 'vnd') {
+        renderVndUI();
+      } else if (currentTemplate === 'vnd-in') {
+        renderVndInUI();
+      }
+      renderSystemBars();
+    }
+
     function triggerAutoSave() {
+      if (!isAppReady) return;
       updateSaveIndicator('saving');
       clearTimeout(autoSaveTimer);
       autoSaveTimer = setTimeout(() => {
@@ -6531,6 +6565,24 @@
           updateSaveIndicator('error');
         }
       }, 300);
+    }
+
+    function flushAutoSaveNow() {
+      if (!isAppReady) return;
+      clearTimeout(autoSaveTimer);
+      try {
+        const snapshot = getFullStateSnapshot();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+        updateSaveIndicator('saved');
+      } catch (e) {
+        console.error("Flush auto-save failed:", e);
+      }
+    }
+
+    // Flush immediately before page unloads or hides so no pending debounce is lost
+    if (typeof window !== 'undefined' && window.addEventListener) {
+      window.addEventListener("beforeunload", flushAutoSaveNow);
+      window.addEventListener("pagehide", flushAutoSaveNow);
     }
 
     function manualSaveNow() {
@@ -6562,21 +6614,7 @@
         if (!raw) return false;
         const data = JSON.parse(raw);
         applyFullStateSnapshot(data, true);
-        
-        // Auto Up-To-Date Daily Check:
-        // Automatically sync dates in all templates to today if the day has changed
-        const todayCalKey = getTodayCalendarKey();
-        if (data.lastCalendarDate !== todayCalKey || (vndState.date && vndState.date.includes("27 May 2026"))) {
-          syncAllTemplatesToToday(false);
-          if (currentTemplate === 'usdt') renderUsdtUI();
-          else if (currentTemplate === 'idr') renderIdrUI();
-          else if (currentTemplate === 'idr-in') renderIdrInUI();
-          else if (currentTemplate === 'vnd') renderVndUI();
-          else if (currentTemplate === 'vnd-in') renderVndInUI();
-          rebuildEditorControls();
-          triggerAutoSave();
-        }
-
+        updateLivePreview();
         updateSaveIndicator('saved');
         return true;
       } catch (e) {
@@ -6597,6 +6635,7 @@
       try {
         const data = JSON.parse(input);
         applyFullStateSnapshot(data, false);
+        updateLivePreview();
         triggerAutoSave();
       } catch (e) {
         alert("Invalid JSON format: " + e.message);
@@ -6607,16 +6646,29 @@
       let data = idrState;
       if (currentTemplate === 'usdt') data = activeUsdt();
       else if (currentTemplate === 'idr-in') data = idrInState;
+      else if (currentTemplate === 'vnd') data = vndState;
+      else if (currentTemplate === 'vnd-in') data = vndInState;
       const jsonStr = JSON.stringify(data, null, 2);
       copyText(jsonStr, "Transaction data copied as JSON!");
     }
 
-    // Auto-save event listeners across all inputs & controls
-    document.addEventListener("input", () => triggerAutoSave(), { passive: true });
-    document.addEventListener("change", () => triggerAutoSave(), { passive: true });
+    // Auto-save & Instant Live Preview event listeners across all inputs & controls
+    document.addEventListener("input", () => {
+      updateLivePreview();
+      triggerAutoSave();
+    }, { passive: true });
+
+    document.addEventListener("change", () => {
+      updateLivePreview();
+      triggerAutoSave();
+    }, { passive: true });
+
     document.addEventListener("click", (e) => {
       if (e.target.closest("button:not(#quickCopyHeaderBtn):not(#manualSaveBtn), .toggle-btn, .radio-btn, .pill-btn, .control-btn, .seg-btn, .curr-tab")) {
-        setTimeout(triggerAutoSave, 50);
+        setTimeout(() => {
+          updateLivePreview();
+          triggerAutoSave();
+        }, 50);
       }
     }, { passive: true });
 
@@ -6665,18 +6717,12 @@
       }
     }
 
-    // Daily Auto-Update Interval & Tab Visibility Rollover Watcher
+    // Daily Auto-Update Interval & Tab Visibility Rollover Watcher (preserves user data)
     let currentActiveDateKey = getTodayCalendarKey();
     setInterval(() => {
       const todayKey = getTodayCalendarKey();
       if (currentActiveDateKey && currentActiveDateKey !== todayKey) {
         currentActiveDateKey = todayKey;
-        syncAllTemplatesToToday(false);
-        if (currentTemplate === 'usdt') renderUsdtUI();
-        else if (currentTemplate === 'idr') renderIdrUI();
-        else if (currentTemplate === 'idr-in') renderIdrInUI();
-        rebuildEditorControls();
-        triggerAutoSave();
       }
     }, 60000);
 
@@ -6685,12 +6731,6 @@
         const todayKey = getTodayCalendarKey();
         if (currentActiveDateKey && currentActiveDateKey !== todayKey) {
           currentActiveDateKey = todayKey;
-          syncAllTemplatesToToday(false);
-          if (currentTemplate === 'usdt') renderUsdtUI();
-          else if (currentTemplate === 'idr') renderIdrUI();
-          else if (currentTemplate === 'idr-in') renderIdrInUI();
-          rebuildEditorControls();
-          triggerAutoSave();
         }
       }
     });
@@ -6706,7 +6746,10 @@
       setChassisFinish('silver');
     } else {
       switchConfigTab('receipt');
+      updateLivePreview();
     }
+    isAppReady = true;
+    triggerAutoSave();
   </script>
 </body>
 
