@@ -1940,41 +1940,6 @@ Pls
       }
     }
 
-        .share-link-header-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 3px 9px;
-      border-radius: 999px;
-      background: #eff6ff;
-      color: #1d4ed8;
-      border: 1px solid #bfdbfe;
-      font-size: 11px;
-      font-weight: 700;
-      cursor: pointer;
-      box-shadow: 0 1px 3px rgba(37, 99, 235, 0.15);
-      transition: all 0.15s ease;
-      white-space: nowrap;
-    }
-    .share-link-header-btn:hover {
-      background: #dbeafe;
-      border-color: #93c5fd;
-      color: #1e40af;
-      transform: translateY(-1px);
-    }
-    .share-link-header-btn:active {
-      transform: translateY(0);
-    }
-
-    .save-indicator.cloud_synced {
-      background: #eff6ff;
-      color: #1d4ed8;
-      border-color: #bfdbfe;
-    }
-    .save-indicator.cloud_synced .save-dot {
-      background: #3b82f6;
-    }
-
     .quick-copy-header-btn {
       display: inline-flex;
       align-items: center;
@@ -3232,14 +3197,6 @@ Pls
           </svg>
           Save
         </button>
-        <button class="share-link-header-btn" id="shareLiveLinkBtn" onclick="shareLiveCloudLink()"
-          title="Copy Live Cloud Link to share with team / view on other phones">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-          </svg>
-          Live Link
-        </button>
         <button class="quick-copy-header-btn" id="quickCopyHeaderBtn" onclick="copyReceiptImageToClipboard()"
           title="Copy 100% Mockup Image to Clipboard (Ctrl+V)">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
@@ -4159,10 +4116,6 @@ Pls
   <!-- Toast Popup -->
   <div class="toast" id="toastMessage">Copied to clipboard</div>
 
-  <!-- Firebase Cloud Realtime Sync SDK -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-
   <script>
     /* html2canvas embedded */
     /*!
@@ -4539,22 +4492,6 @@ Pls
     const STORAGE_KEY = "receipt_mockup_autosave";
     let autoSaveTimer = null;
     let isAppReady = false;
-    let firestoreDb = null;
-    let currentRoomId = "main";
-    let isSyncingFromCloud = false;
-    let myDeviceId = (function() {
-      try {
-        let id = sessionStorage.getItem('mockup_device_id');
-        if (!id) {
-          id = 'dev_' + Math.random().toString(36).substring(2, 10);
-          sessionStorage.setItem('mockup_device_id', id);
-        }
-        return id;
-      } catch (e) {
-        return 'dev_' + Math.random().toString(36).substring(2, 10);
-      }
-    })();
-    let lastLocalWriteTime = 0;
 
     const idrState = {
       successTitle: "Successful!",
@@ -6648,7 +6585,12 @@ Pls
       }
       if (data.templateData) {
         if (data.templateData.idr) Object.assign(idrState, data.templateData.idr);
-        if (data.templateData.idrIn) Object.assign(idrInState, data.templateData.idrIn);
+        if (data.templateData.idrIn) {
+          Object.assign(idrInState, data.templateData.idrIn);
+          if (Array.isArray(data.templateData.idrIn.transactions)) {
+            idrInState.transactions = JSON.parse(JSON.stringify(data.templateData.idrIn.transactions));
+          }
+        }
         if (data.templateData.usdt) Object.assign(usdtState, data.templateData.usdt);
         if (data.templateData.usdtDeposit) Object.assign(usdtDepState, data.templateData.usdtDeposit);
         if (data.templateData.vnd) {
@@ -6706,139 +6648,69 @@ Pls
     }
 
     // ============================================================================
-    // Realtime Multi-Device Cloud Sync System (Firebase Firestore)
+    // 100% Form Data State Backup, Auto-Save & Persistence System (Per-Device)
     // ============================================================================
-    const firebaseConfig = {
-      projectId: "fong-13b9c",
-      appId: "1:654246325949:web:e52a063b87254cacc911d4",
-      storageBucket: "fong-13b9c.firebasestorage.app",
-      apiKey: "AIzaSyCik2caeNNibQ6xfrl8yHvDTIcBdjLcttQ",
-      authDomain: "fong-13b9c.firebaseapp.com",
-      messagingSenderId: "654246325949",
-      measurementId: "G-8BGXVV91LL"
-    };
-
-    function initCloudSync() {
-      try {
-        const urlParams = new URLSearchParams(window.location.search);
-        const room = urlParams.get('room');
-        if (room && room.trim()) {
-          currentRoomId = room.trim().replace(/[^a-zA-Z0-9_\-]/g, '');
-        }
-
-        if (typeof firebase !== 'undefined') {
-          if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-          }
-          firestoreDb = firebase.firestore();
-          listenToCloudRoom(currentRoomId);
-        } else {
-          console.warn("Firebase SDK not available, running in local-only mode");
-        }
-      } catch (err) {
-        console.warn("initCloudSync error:", err);
+    function updateSaveIndicator(status) {
+      const indicator = document.getElementById("saveIndicator");
+      if (!indicator) return;
+      const textSpan = indicator.querySelector(".save-text");
+      if (status === 'saving') {
+        indicator.className = "save-indicator saving";
+        if (textSpan) textSpan.textContent = "Saving...";
+      } else if (status === 'manual') {
+        indicator.className = "save-indicator saved";
+        if (textSpan) textSpan.textContent = "Saved";
+      } else if (status === 'saved') {
+        indicator.className = "save-indicator saved";
+        if (textSpan) textSpan.textContent = "Auto-saved";
+      } else if (status === 'error') {
+        indicator.className = "save-indicator";
+        if (textSpan) textSpan.textContent = "Save Error";
       }
     }
 
-    function listenToCloudRoom(roomId) {
-      if (!firestoreDb) return;
-      firestoreDb.collection("receipt_mockups").doc(roomId).onSnapshot((doc) => {
-        if (!doc.exists) {
-          saveToCloudRoom(roomId, getFullStateSnapshot(), true);
-          return;
-        }
-        const data = doc.data();
-        if (!data || !data.payload) return;
-
-        // Skip echo of our own recent save (same client device)
-        if (data.deviceId === myDeviceId) return;
-
-        try {
-          const snapshot = JSON.parse(data.payload);
-          isSyncingFromCloud = true;
-          applyFullStateSnapshot(snapshot, true);
-          updateLivePreview();
-          updateSaveIndicator('cloud_synced');
-          showToast("☁️ Synced latest update from other device!");
-          setTimeout(() => { isSyncingFromCloud = false; }, 350);
-        } catch (e) {
-          console.warn("Failed to parse cloud snapshot:", e);
-          isSyncingFromCloud = false;
-        }
-      }, (err) => {
-        console.warn("Firestore snapshot error:", err);
-      });
-    }
-
-    function saveToCloudRoom(roomId, snapshot, isInitial = false) {
-      if (!firestoreDb || isSyncingFromCloud) return;
-      lastLocalWriteTime = Date.now();
-      firestoreDb.collection("receipt_mockups").doc(roomId).set({
-        payload: JSON.stringify(snapshot),
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        deviceId: myDeviceId,
-        template: currentTemplate
-      }, { merge: true }).then(() => {
-        updateSaveIndicator('cloud_saved');
-      }).catch((err) => {
-        console.warn("Cloud save failed:", err);
-        updateSaveIndicator('saved');
-      });
-    }
-
-    function shareLiveCloudLink() {
-      const base = window.location.origin + window.location.pathname;
-      const shareUrl = currentRoomId && currentRoomId !== 'main' ? `${base}?room=${encodeURIComponent(currentRoomId)}` : base;
-      copyText(shareUrl, "✅ Live link copied! Open on other phones or PCs for live sync.");
-    }
-
     function triggerAutoSave() {
-      if (!isAppReady || isSyncingFromCloud) return;
+      if (!isAppReady) return;
       updateSaveIndicator('saving');
       clearTimeout(autoSaveTimer);
       autoSaveTimer = setTimeout(() => {
-        try {
-          const snapshot = getFullStateSnapshot();
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
-          if (firestoreDb) {
-            saveToCloudRoom(currentRoomId, snapshot);
-          } else {
-            updateSaveIndicator('saved');
-          }
-        } catch (e) {
-          console.error("Auto-save failed:", e);
-          updateSaveIndicator('error');
-        }
-      }, 350);
+        flushAutoSaveNow();
+      }, 150);
     }
 
     function flushAutoSaveNow() {
-      if (!isAppReady || isSyncingFromCloud) return;
+      if (!isAppReady) return;
       clearTimeout(autoSaveTimer);
       try {
         const snapshot = getFullStateSnapshot();
         localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
-        if (firestoreDb) {
-          saveToCloudRoom(currentRoomId, snapshot);
-        }
+        updateSaveIndicator('saved');
       } catch (e) {
-        console.error("Flush auto-save failed:", e);
+        console.error("Auto-save failed:", e);
+        updateSaveIndicator('error');
       }
     }
 
-    // Flush immediately before page unloads or hides so no pending debounce is lost
+    // Flush immediately before page unloads, hides, or switches tabs
     if (typeof window !== 'undefined' && window.addEventListener) {
       window.addEventListener("beforeunload", flushAutoSaveNow);
       window.addEventListener("pagehide", flushAutoSaveNow);
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === 'hidden') {
+          flushAutoSaveNow();
+        }
+      });
+      // Flush whenever an input or textarea finishes editing (blur)
+      document.addEventListener("focusout", (e) => {
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT')) {
+          flushAutoSaveNow();
+        }
+      }, { passive: true });
     }
 
     function manualSaveNow() {
       try {
-        const snapshot = getFullStateSnapshot();
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
-        if (firestoreDb) {
-          saveToCloudRoom(currentRoomId, snapshot);
-        }
+        flushAutoSaveNow();
         updateSaveIndicator('manual');
         const btn = document.getElementById("manualSaveBtn");
         if (btn) {
@@ -6852,7 +6724,7 @@ Pls
             btn.style.color = "";
           }, 1500);
         }
-        showToast("✅ All changes saved successfully!");
+        showToast("✅ All changes saved to your browser!");
       } catch (e) {
         alert("Failed to save: " + e.message);
       }
@@ -6911,6 +6783,19 @@ Pls
     document.addEventListener("change", () => {
       updateLivePreview();
       triggerAutoSave();
+    }, { passive: true });
+
+    document.addEventListener("paste", () => {
+      setTimeout(() => {
+        updateLivePreview();
+        triggerAutoSave();
+      }, 20);
+    }, { passive: true });
+
+    document.addEventListener("keyup", (e) => {
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
+        triggerAutoSave();
+      }
     }, { passive: true });
 
     document.addEventListener("click", (e) => {
@@ -6999,8 +6884,7 @@ Pls
       updateLivePreview();
     }
     isAppReady = true;
-    initCloudSync();
-    triggerAutoSave();
+        triggerAutoSave();
   </script>
 </body>
 
